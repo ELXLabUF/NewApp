@@ -5,6 +5,7 @@
     android:id="@+id/watch_view_stub"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/black"
     app:rectLayout="@layout/rect_activity_message_record"
     app:roundLayout="@layout/round_activity_message_record"
     tools:context="com.example.newapp.MessageRecord"

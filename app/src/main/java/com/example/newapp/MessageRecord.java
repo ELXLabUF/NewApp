@@ -10,6 +10,7 @@ import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.wearable.view.WatchViewStub;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.Animation;
@@ -27,6 +28,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.PrintStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -37,6 +39,7 @@ import java.util.Locale;
 public class MessageRecord extends Activity {
 
     private TextView mTextView;
+    public static String EXTRA_MESSAGE = "com.example.newapp.MESSAGE";
     private static final int RECORDER_SAMPLERATE = 44100;
     private static final int RECORDER_CHANNELS = AudioFormat.CHANNEL_IN_MONO;
     private static final int RECORDER_AUDIO_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
@@ -44,6 +47,10 @@ public class MessageRecord extends Activity {
     private Thread recordingThread = null;
     private boolean isRecording = false;
     private boolean isRecordingButtonPressed = false;
+    private int numberOfRecordings = MainActivity.numRecordings() + 1;
+    private String recording_details = "";
+    private String startTime;
+    private String endTime;
 
 
     @Override
@@ -59,6 +66,11 @@ public class MessageRecord extends Activity {
         });
 
         setContentView(R.layout.rect_activity_message_record);
+        Log.d("Number of Recordings",String.format("number of recordings = %d", numberOfRecordings));
+
+        Intent intent = getIntent();
+        recording_details = intent.getStringExtra(MainActivity.EXTRA_MESSAGE);
+        Log.d("Recording Details",recording_details);
 
         ImageButton playButton = (ImageButton) findViewById(R.id.recordButton);
         playButton.setBackground(getResources().getDrawable(R.drawable.record_button));
@@ -70,9 +82,10 @@ public class MessageRecord extends Activity {
         final Animation animationFadeIn = AnimationUtils.loadAnimation(this, R.anim.fadein);
         final Animation animationFadeOut = AnimationUtils.loadAnimation(this, R.anim.fadeout);
 
+
         final String currentRecordings = "Recording";
         textView.setTextColor(Color.parseColor("#FFFFFF"));
-        textView.setText(currentRecordings);
+        //textView.setText(currentRecordings);
 
         opacityImage.setVisibility(View.VISIBLE);
 
@@ -86,6 +99,8 @@ public class MessageRecord extends Activity {
                         e.printStackTrace();
                     }
                     //Chapter.myVP.setPagingEnabled(false);
+                    startTime = new SimpleDateFormat("MM-dd-yyyy HH:mm:ss", Locale.US).format(new Date());
+                    recording_details = recording_details + ",recording_" + numberOfRecordings + "," + startTime;
                     textView.setTextColor(Color.parseColor("#FF0000"));
                     textView.setText("Recording...");
 
@@ -98,9 +113,10 @@ public class MessageRecord extends Activity {
                         e.printStackTrace();
                     }
                     //Chapter.myVP.setPagingEnabled(true);
-
+                    endTime = new SimpleDateFormat("MM-dd-yyyy HH:mm:ss", Locale.US).format(new Date());
+                    recording_details = recording_details + "," + endTime;
                     textView.setTextColor(Color.parseColor("#FFFFFF"));
-                    textView.setText(currentRecordings); //finger was lifted
+                    textView.setText(""); //finger was lifted
 
                     //STARTING FADE IN OF AUDIO SUBMIT MENU
                     button.setEnabled(false);
@@ -120,7 +136,7 @@ public class MessageRecord extends Activity {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 if(event.getAction() == MotionEvent.ACTION_DOWN) {
-
+                    String declineTime = new SimpleDateFormat("MM-dd-yyyy HH:mm:ss", Locale.US).format(new Date());
                     uploadButton.startAnimation(animationFadeOut);
                     uploadButton.setVisibility(v.INVISIBLE);
                     discardButton.startAnimation(animationFadeOut);
@@ -128,6 +144,8 @@ public class MessageRecord extends Activity {
                     uploadButton.setEnabled(false);
                     discardButton.setEnabled(false);
                     button.setEnabled(true);
+
+                    recording_details = recording_details + ",Declined at " + declineTime + ",,";
                     deleteRecording();
                 }
                 return true;
@@ -156,7 +174,35 @@ public class MessageRecord extends Activity {
     }
 
     private void deleteRecording(){
+        String filePath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "Memories" + File.separator + "recording_" + numberOfRecordings;
+        File dir = new File("/sdcard/Memories");
+        try{
+            if(dir.mkdir()) {
+                Log.d("Directory created: ", "Success");
+            } else {
+                Log.d("Directory not created: ", "Success");
+            }
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+        File newWavFile = new File (filePath + ".wav");
+        newWavFile.delete();
+        try {
+            File file = new File("/sdcard/Memories/response_recordings.txt");
+            FileOutputStream fileinput = new FileOutputStream(file, true);
+            PrintStream printstream = new PrintStream(fileinput);
+            printstream.print(recording_details+"\n");
+            fileinput.close();
 
+
+        } catch (java.io.IOException e) {
+            //if caught
+
+        }
+        Intent intent;
+        intent = new Intent(this, MainActivity.class);
+        startActivity(intent);
+        this.finish();
     }
 
 
@@ -176,7 +222,18 @@ public class MessageRecord extends Activity {
 
     private void writeAudioDataToFile() {
         // Write the output audio in byte
-        String filePath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "chapter_recording" + ".pcm";
+        Log.d("Number of Recordings",String.format("number of recordings = %d", numberOfRecordings));
+        String filePath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "Memories" + File.separator + "recording_" + numberOfRecordings + ".pcm";
+        File dir = new File("/sdcard/Memories");
+        try{
+            if(dir.mkdir()) {
+                Log.d("Directory created: ", "Success");
+            } else {
+                Log.d("Directory not created: ", "Success");
+            }
+        }catch(Exception e){
+            e.printStackTrace();
+        }
         short sData[] = new short[BufferElements2Rec];
 
         FileOutputStream os = null;
@@ -213,7 +270,8 @@ public class MessageRecord extends Activity {
             recorder.stop();
             recorder.release();
             recorder = null;
-            String filePath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "chapter_recording";
+            Log.d("Number of Recordings",String.format("number of recordings = %d", numberOfRecordings));
+            String filePath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "Memories" + File.separator + "recording_" + numberOfRecordings;
             File oldPcmFile = new File (filePath + ".pcm");
             File newWaveFile = new File(filePath + ".wav");
             try {
@@ -221,7 +279,7 @@ public class MessageRecord extends Activity {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            oldPcmFile.delete();
+            //oldPcmFile.delete();
             recordingThread = null;
         }
     }
@@ -337,10 +395,15 @@ public class MessageRecord extends Activity {
     }
 
     public void uploadRecording(View v){
-
+        String confirmTime = new SimpleDateFormat("MM-dd-yyyy HH:mm:ss", Locale.US).format(new Date());
+        String message = recording_details + ",Confirmed at " + confirmTime;
+        String filePath = Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "Memories" + File.separator + "recording_" + numberOfRecordings;
+        File oldPcmFile = new File (filePath + ".pcm");
+        oldPcmFile.delete();
         Intent intent = new Intent(this, MessagePromptEnd.class);
         ActivityOptions options = ActivityOptions.makeScaleUpAnimation(v, 0,
                 0, v.getWidth(), v.getHeight());
+        intent.putExtra(EXTRA_MESSAGE, message);
         startActivity(intent, options.toBundle());
         finish();
     }
